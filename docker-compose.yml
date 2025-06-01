@@ -1,0 +1,69 @@
+version: '3.8'  # Versión de la sintaxis de Docker Compose
+
+services:
+  # Servicio principal de la aplicación REST construida con Spring Boot
+  rest-service:
+    build:
+      context: .  # Ruta al directorio del proyecto (donde se encuentra el Dockerfile)
+      dockerfile: Dockerfile  # Se especifica que se usará el Dockerfile multietapa
+    ports:
+      - "8080:8080"  # Mapea el puerto 8080 del contenedor al puerto 8080 del host
+    depends_on:
+      - mongo-db  # Este servicio se inicia después de que mongo-db esté listo
+      - maria-db  # Este servicio se inicia después de que maria-db esté listo
+    environment:  # Variables de entorno necesarias para la configuración de Spring Boot
+      SPRING_DATA_MONGODB_URI: mongodb://persona_db:persona_db@mongo-db:27017/persona_db?authSource=persona_db
+      SPRING_DATASOURCE_URL: jdbc:mariadb://maria-db:3306/persona_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: example
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.mariadb.jdbc.Driver
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MariaDBDialect
+      APP_DEBUG_LEVEL: INFO  # Nivel de logs de la aplicación
+    networks:
+      - app_network  # Conecta este servicio a la red compartida
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  # (Opcional) Script de inicialización SQL
+      - ./entrypoint.sh:/entrypoint.sh  # (Opcional) Script personalizado de arranque
+
+  # Servicio de base de datos MongoDB
+  mongo-db:
+    image: mongo:latest  # Imagen oficial de MongoDB
+    container_name: mongodb  # Nombre personalizado del contenedor
+    ports:
+      - "27017:27017"  # Puerto por defecto de MongoDB
+    environment:  # Configuración inicial del contenedor Mongo
+      MONGO_INITDB_DATABASE: persona_db
+      MONGO_INITDB_ROOT_USERNAME: persona_db
+      MONGO_INITDB_ROOT_PASSWORD: persona_db
+    volumes:
+      - mongo_data:/data/db  # Volumen persistente para los datos de Mongo
+      - ./scripts/persona_ddl_mongo.js:/docker-entrypoint-initdb.d/persona_ddl_mongo.js:ro  # Script de estructura (solo lectura)
+      - ./scripts/persona_dml_mongo.js:/docker-entrypoint-initdb.d/persona_dml_mongo.js:ro  # Script de datos iniciales (solo lectura)
+    networks:
+      - app_network  # Red compartida para conexión con otros servicios
+
+  # Servicio de base de datos MariaDB
+  maria-db:
+    image: mariadb:latest  # Imagen oficial de MariaDB
+    container_name: mariadb  # Nombre personalizado del contenedor
+    ports:
+      - "3306:3306"  # Puerto por defecto de MariaDB
+    environment:  # Variables necesarias para inicializar la base de datos
+      MYSQL_ROOT_PASSWORD: example
+      MYSQL_DATABASE: persona_db
+    volumes:
+      - maria_data:/var/lib/mysql  # Volumen persistente para los datos de MariaDB
+      - ./scripts/persona_ddl_maria.sql:/docker-entrypoint-initdb.d/persona_ddl_maria.sql:ro  # Script de estructura (solo lectura)
+      - ./scripts/persona_dml_maria.sql:/docker-entrypoint-initdb.d/persona_dml_maria.sql:ro  # Script de datos iniciales (solo lectura)
+    networks:
+      - app_network  # Conectado a la misma red que los demás servicios
+
+# Definición de la red que será usada por todos los servicios
+networks:
+  app_network:
+    driver: bridge  # Tipo de red: bridge (por defecto)
+
+# Definición de los volúmenes persistentes para las bases de datos
+volumes:
+  mongo_data:  # Volumen para datos de MongoDB
+  maria_data:  # Volumen para datos de MariaDB
