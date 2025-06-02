@@ -8,7 +8,6 @@ Este proyecto es una aplicación de demostración basada en arquitectura hexagon
 - Preparación del Entorno  
 - Compilación y Despliegue  
 - Uso  
-- Configuración Adicional  
 - Notas
 
 ## Requisitos Previos
